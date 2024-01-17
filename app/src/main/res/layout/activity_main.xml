@@ -1,0 +1,35 @@
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:orientation="vertical"
+            android:layout_height="match_parent">
+        <EditText
+            android:id="@+id/etUrlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter WHEP URL"/>
+
+        <Button
+            android:id="@+id/btnNativeWebRTC"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Native WebRTC"/>
+
+        <Button
+            android:id="@+id/btnWebView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WebView"/>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
