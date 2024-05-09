@@ -63,6 +63,6 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
-    implementation("com.dafruits:webrtc:120.0.0")
+    implementation("io.cmix:webrtc:124.0.0")
 
 }
