@@ -1,6 +1,7 @@
 package com.example.whepexample
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,14 +58,14 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
         if (config.disableAudio && config.disableVideo) {
             throw IllegalArgumentException("Cannot disable both audio and video")
         }
-        println("initializing")
-        println("Initializing PeerConnection")
+        Log.d("WHEPClient","initializing")
+        Log.d("WHEPClient","Initializing PeerConnection")
         initializePeerConnection()
 
-        println("Setting up Transceivers")
+        Log.d("WHEPClient","Setting up Transceivers")
         setupTransceivers()
 
-        println("Assigning Observers")
+        Log.d("WHEPClient","Assigning Observers")
     }
 
     private fun initializePeerConnection() {
@@ -104,7 +105,6 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
         peerConnection = peerConnectionFactory?.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
 
             override fun onIceGatheringChange(iceGatheringState: PeerConnection.IceGatheringState?) {
-                println(iceGatheringState)
                 if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
                     iceGatheringComplete.complete(peerConnection?.localDescription?.description)
                 }
@@ -113,9 +113,13 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
             override fun onTrack(rtpTransceiver: RtpTransceiver?) {
                 rtpTransceiver?.receiver?.track()?.let { track ->
                     when (track.kind()) {
-                        "video" -> if (!config.disableVideo) addTrackToStream(track)
-                        "audio" -> if (!config.disableAudio) addTrackToStream(track)
-                        else -> println("Received unknown track kind: ${track.kind()}")
+                        "video" -> if (!config.disableVideo) addTrackToStream(track) else {
+                            Log.d("WHEPClient", "Ignoring video track")
+                        }
+                        "audio" -> if (!config.disableAudio) addTrackToStream(track)else {
+                            Log.d("WHEPClient","Ignoring audio track")
+                        }
+                        else -> Log.d("WHEPClient","Received unknown track kind: ${track.kind()}")
                     }
                 }
             }
@@ -177,22 +181,22 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
         when (track) {
             is AudioTrack -> mediaStream?.addTrack(track)
             is VideoTrack -> {
-                println("video track being added")
+                Log.d("WHEPClient","video track being added")
                 mediaStream?.addTrack(track)
                 mediaStream?.let { nonNullMediaStream ->
                     notifyStreamAvailable(nonNullMediaStream)
                 } ?: run {
-                    println("Error: MediaStream is null when trying to add VideoTrack.")
+                    Log.d("WHEPClient","Error: MediaStream is null when trying to add VideoTrack.")
                 }
             }
-            else -> println("Unknown track type: ${track.kind()}")
+            else -> Log.d("WHEPClient","Unknown track type: ${track.kind()}")
         }
     }
 
 
     private suspend fun waitToCompleteICEGathering(): String? {
         return try {
-            withTimeoutOrNull(5000) {
+            withTimeoutOrNull(1000) {
                 iceGatheringComplete.await()
             } ?: peerConnection?.localDescription?.description
         } catch (e: Exception) {
@@ -202,7 +206,7 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
 
 
     private suspend fun negotiateConnectionWithClientOffer(): String? {
-        println("Negotiating connection")
+        Log.d("WHEPClient","Negotiating connection")
         val offerCreationDeferred = CompletableDeferred<SessionDescription>()
         val setLocalDescDeferred = CompletableDeferred<Unit>()
         val setRemoteDescDeferred = CompletableDeferred<Unit>()
@@ -223,9 +227,9 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
             override fun onSetFailure(s: String?) {}
         }, MediaConstraints())
 
-        println("Creating Offer")
+        Log.d("WHEPClient","Creating Offer")
         val offer = offerCreationDeferred.await()
-        println("Offer created")
+        Log.d("WHEPClient","Offer created")
         peerConnection?.setLocalDescription(object : SdpObserver {
             override fun onSetSuccess() {
                 setLocalDescDeferred.complete(Unit)
@@ -238,16 +242,16 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
             }
         }, offer)
 
-        println("Setting local description")
+        Log.d("WHEPClient","Setting local description")
         setLocalDescDeferred.await()
-        println("Local description set")
+        Log.d("WHEPClient","Local description set")
 
-        println("Gathering ICE candidates")
+        Log.d("WHEPClient","Gathering ICE candidates")
         val initialisedOffer = waitToCompleteICEGathering()
             ?: throw Exception("Failed to gather ICE candidates for offer")
 
-        println("Gathering ICE candidates complete")
-            println("Exchanging offer")
+        Log.d("WHEPClient","Gathering ICE candidates complete")
+            Log.d("WHEPClient","Exchanging offer")
 
         val resultDeferred = CompletableDeferred<String?>()
         coroutineScope.launch(Dispatchers.IO) {
@@ -255,7 +259,7 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
             val response = withContext(Dispatchers.IO) {
                 postSDPOffer(endpoint, initialisedOffer)
             }
-            println("Response received")
+            Log.d("WHEPClient","Response received")
 
             when (response.responseCode) {
                 201 -> {
@@ -279,25 +283,25 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
                         )
                     }
 
-                    println("Answer received, setting remote description")
+                    Log.d("WHEPClient","Answer received, setting remote description")
                     setRemoteDescDeferred.await() // Wait for the remote description to be set
-                    println("Answer set")
+                    Log.d("WHEPClient","Answer set")
                     resultDeferred.complete(response.getHeaderField("Location"))
                 }
 
                 403 -> {
-                    println("Token is invalid")
+                    Log.d("WHEPClient","Token is invalid")
                     throw Error("Unauthorized")
                 }
 
                 405 -> {
-                    println("Must be returned for future WHEP spec updates")
+                    Log.d("WHEPClient","Must be returned for future WHEP spec updates")
                 }
 
                 else -> {
                     val errorMessage =
                         response.errorStream.bufferedReader().use { it.readText() }
-                    println(errorMessage)
+                    Log.d("WHEPClient",errorMessage)
                 }
             }
 
@@ -318,6 +322,7 @@ class WHEPClient(private val context: Context, private val endpoint: String, pri
     }
 
     fun cleanup() {
+        Log.d("WHEPClient", "clean up")
         coroutineScope.cancel()
         peerConnection?.close()
     }
